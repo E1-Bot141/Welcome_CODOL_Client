@@ -1,0 +1,45 @@
+--- a/engine/game/scripts/maps/mp/gametypes/_damagefeedback.gsc
++++ b/engine/game/scripts/maps/mp/gametypes/_damagefeedback.gsc
+@@ -4,6 +4,7 @@
+ 	precacheShader("damage_feedback_j");
+ 	precacheShader("damage_feedback_endgame");
+ 	precacheShader("scavenger_pickup");
++	precacheShader("kill_feedback");
+ 
+ 	level thread onPlayerConnect();
+ }
+@@ -44,7 +45,16 @@
+ 	feedbackDurationOverride = 0;
+ 	startAlpha = 1;
+ 	
+-	if ( typeHit == "hitBodyArmor" )
++	// A lethal hit swaps the marker to the red kill_feedback art. The caller
++	// passes "kill" only when this damage killed the victim, so the same
++	// element still shows damage_feedback for every non-lethal hit. The hit
++	// sound is deliberately unchanged here; only the marker art is.
++	if ( typeHit == "kill" )
++	{
++		self.hud_damagefeedback setShader("kill_feedback", 24, 48);
++		self playlocalsound("MP_hit_alert");
++	}
++	else if ( typeHit == "hitBodyArmor" )
+ 	{
+ 		self.hud_damagefeedback setShader("damage_feedback_j", 24, 48);
+ 		self playlocalsound("MP_hit_alert"); // TODO: change sound?
+--- a/engine/game/scripts/maps/mp/gametypes/_damage.gsc
++++ b/engine/game/scripts/maps/mp/gametypes/_damage.gsc
+@@ -1541,7 +1541,13 @@
+ 
+ 		if ( isDefined( damager) && damager != victim && iDamage > 0 )
+ 		{
+-			if ( iDFlags & level.iDFLAGS_STUN )
++			// finishPlayerDamageWrapper has already applied this damage, so a
++			// victim that is no longer alive (a faux death counts as dead) was
++			// killed by this hit. Kill wins over the armour and endgame art:
++			// a lethal hit must leave the red kill marker, never the hit one.
++			if ( !isReallyAlive( victim ) )
++				typeHit = "kill";
++			else if ( iDFlags & level.iDFLAGS_STUN )
+ 				typeHit = "stun";
+ 			else if ( victim hasPerk( "specialty_armorvest", true ) || (isExplosiveDamage( sMeansOfDeath ) && victim _hasPerk( "_specialty_blastshield" )) )
+ 				typeHit = "hitBodyArmor";
